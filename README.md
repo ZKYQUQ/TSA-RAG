@@ -121,5 +121,35 @@ Short-form QA:
 python src/eval/short_form_eval.py \
   --result_file outputs/hotpotqa/final_output.json
 ```
+Long-form QA uses the ALCE evaluation scripts. Run the commands from `src/ALCE` so the local imports resolve correctly:
 
-Long-form evaluation utilities are under `src/ALCE`. Please follow the argument format in `src/ALCE/README.md`.
+```bash
+cd src/ALCE
+```
+
+ASQA:
+
+```bash
+python eval.py \
+  --f ../../outputs/asqa/final_output.json \
+  --qa \
+  --mauve
+```
+
+QAMPARI:
+
+```bash
+python eval.py \
+  --f ../../outputs/qampari/final_output.json
+```
+
+ELI5:
+
+```bash
+python eval.py \
+  --f ../../outputs/eli5/final_output.json \
+  --claims_nli \
+  --mauve
+```
+
+ALCE downloads or loads additional metric models for QA, claim verification, and MAUVE; set `ALCE_QA_MODEL`, `ALCE_AUTOAIS_MODEL`, and `MAUVE_FEATURIZE_MODEL` if you use local model paths.
