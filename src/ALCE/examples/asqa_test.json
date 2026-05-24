@@ -1,0 +1,37 @@
+{
+    "data": [
+        {
+            "sample_id": "1",
+            "question": "Who has the highest goals in world football?",
+            "qa_pairs": [
+                {
+                    "question": "Who has the highest goals in men's world international football?",
+                    "short_answers": ["Daei", "Ali Daei"]
+                },
+                {
+                    "question": "Who has the highest goals all-time in men's football?",
+                    "short_answers": ["Bican", "Josef Bican"]
+                },
+                {
+                    "question": "Who has the highest goals in women's world international football?",
+                    "short_answers": ["Sinclair", "Christine Sinclair"]
+                }
+            ],
+            "annotations": [
+                {
+                    "knowledge": [],
+                    "long_answer": "Ali Dael has the highest goals in men's world international football with 109 goals. Josef Bican has the highest goals all-time in men's football and Christine Sinclair has the highest goals in women's world international football."
+
+                },
+                {
+                    "knowledge": [ { "content": "Sinclair is the world's all-time leader for international goals scored for men or women with 187 goals, and is one of the most-capped active international footballer with 300 caps.", "wikipage": "Christine Sinclair" }, { "content": "Along with Cristiano Ronaldo, he is the world's joint all-time leading goalscorer in the history of men's international football with 109 goals scored for Iran.", "wikipage": "Ali Daei" }, { "content": "Ronaldo holds the records for most goals (134) and assists (42) in the Champions League, most goals in the European Championship (14), and is currently tied with Ali Daei for most international goals (109).", "wikipage": "Cristiano Ronaldo" }, { "content": "FIFA, the international governing body of football, have never released a list detailing the highest goalscorers and do not keep official records;[6][7] in 2020, they recognised Bican, an Austrian-Czech dual international who played between the 1930s and the 1950s,[8] as the record scorer with an estimated 805 goals,[9][10] while CNN, the BBC, France 24, and O Jogo all acknowledge that Bican's tally of 805 includes goals scored for reserve teams and in unofficial international matches.", "wikipage": "List of footballers with 500 or more goals" } ],
+                    "long_answer": "The players with the highest all-time goals and highest men's and women's international football goals differ. The player with the highest all-time men's football goals is Josef Bican, who in 2020 was recognized by FIFA, the international governing body of football, as the record scorer with an estimated 805 goals. Christine Sinclair has the highest goals in women's international football with 187 and is the all-time leader for international goals scored for men or women. Cristiano Ronaldo and Ali Daei are currently tied for leading goalscorer in the history of men's international football with 109."
+                }
+            ],
+            "answer": "The players with the highest all-time goals and highest men's and women's international football goals differ. The player with the highest all-time men's football goals is Josef Bican, who in 2020 was recognized by FIFA, the international governing body of football, as the record scorer with an estimated 805 goals. Christine Sinclair has the highest goals in women's international football with 187 and is the all-time leader for international goals scored for men or women. Cristiano Ronaldo and Ali Daei are currently tied for leading goalscorer in the history of men's international football with 109.",
+            "output": "The highest goal-scorers in football history vary by category. Josef Bican holds the record for most all-time men's football goals (805). In international football, Cristiano Ronaldo and Ali Daei share the men's record (109 goals), while Christine Sinclair leads women's international football with 187 goals - the overall international record for both men and women."
+        }
+        
+    ],
+    "config": {}
+}

@@ -1,0 +1,31 @@
+{
+    "data": [
+        {
+            "id": "799__wikidata_simple__dev",
+            "question": "What manga was drawn by Ryoichi Ikegami?",
+            "answers": [
+                [
+                    "Heat"
+                ],
+                [
+                    "Mai, the Psychic Girl"
+                ],
+                [
+                    "Wounded Man"
+                ],
+                [
+                    "Sanctuary"
+                ],
+                [
+                    "Crying Freeman"
+                ],
+                [
+                    "Strain"
+                ]
+            ],
+            "output": "Heat, Wounded Man"
+        }
+        
+    ],
+    "config": {}
+}

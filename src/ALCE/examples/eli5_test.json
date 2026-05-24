@@ -1,0 +1,17 @@
+{
+    "data": [
+        {
+            "id": "1",
+            "question": "How are firms like snapchat, uber etc valued so highly while still not making a profit? Do venture capitalists not expect some form of repayment within a number of years?",
+            "answer": "Yes. Did you watch The Social Network? They went a while before introducing ads, so they could make money, as they needed to establish their brand and amass users. Once you have dedicated users, introducing ads won't deter most, but if you are still new, having ads will deter a lot. The same goes for Uber, it's not that they aren't making money, it's that they are reinvesting a ton of it to make their service better.",
+            "output": "Yes. Think about companies like Spotify or Netflix in their early days. They initially focused on growing their user base and improving their platform before heavily monetizing through subscriptions or ads. If they had pushed too hard for revenue too soon, they might have scared away potential users who weren’t yet loyal. The same applies to Tesla—they didn’t turn a profit for years because they were pouring money into R&D, infrastructure, and scaling production. Once they had a strong market position and brand loyalty, they could start optimizing for profitability. It’s not that they weren’t capable of making money earlier; they were strategically prioritizing long-term dominance over short-term gains.",
+            "claims": [
+                "Firms like Snapchat and Uber need to establish their brand and amass users before introducing ads.",
+                "Introducing ads too early can deter potential users.",
+                "Uber is reinvesting a lot of money to make their service better."
+            ]
+        }
+        
+    ],
+    "config": {}
+}
