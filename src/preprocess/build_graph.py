@@ -23,17 +23,16 @@ class WikipediaGraphBuilderWithEmbedding:
         self.batch_size = batch_size
         self.embedding_batch_size = embedding_batch_size
         
-        # 初始化Contriever模型
-        print("正在加载Contriever模型...")
+        print("Loading Contriever model...")
         self.tokenizer = AutoTokenizer.from_pretrained(contriever_model_path)
         self.model = AutoModel.from_pretrained(contriever_model_path)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = self.model.to(self.device)
         self.model.eval()
-        print(f"模型已加载到设备: {self.device}")
+        print(f"Model loaded on device: {self.device}")
     
     def get_contriever_embeddings(self, texts, batch_size=None):
-        """批量计算文本嵌入"""
+        """Compute text embeddings in batches."""
         if batch_size is None:
             batch_size = self.embedding_batch_size
             
@@ -47,7 +46,7 @@ class WikipediaGraphBuilderWithEmbedding:
                                    return_tensors='pt', max_length=512).to(self.device)
             with torch.no_grad():
                 outputs = self.model(**inputs)
-            # 平均池化
+            # Mean pooling.
             mask = inputs['attention_mask']
             token_embeddings = outputs[0].masked_fill(~mask[..., None].bool(), 0.)
             batch_embeddings = token_embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
@@ -59,14 +58,14 @@ class WikipediaGraphBuilderWithEmbedding:
             raise ValueError("No embeddings computed, check input texts.")
     
     def format_embedded_text(self, title, intro):
-        """格式化文档嵌入文本"""
+        """Format document text for embedding."""
         return f"{title}\n{intro}"
     
     def _get_intro_text(self, extracted_nodes):
-        """从extracted_nodes中提取intro文本"""
+        """Extract the intro text from extracted_nodes."""
         intro_parts = []
         for node in extracted_nodes:
-            if node["id"] == 0:  # 跳过标题节点
+            if node["id"] == 0:
                 continue
             if node["type"] == "content":
                 intro_parts.append(node["text"])
@@ -75,11 +74,11 @@ class WikipediaGraphBuilderWithEmbedding:
         return "\n".join(intro_parts)
     
     def _process_batch(self, filename, batch_lines):
-        """处理一批数据并生成Neo4j查询"""
+        """Process one batch and prepare Neo4j writes."""
         create_nodes = []
         create_rels = []
         
-        # 收集所有文档的文本用于批量embedding
+        # Collect document text for batched embedding.
         texts_for_embedding = []
         processed_docs = []
         
@@ -89,7 +88,6 @@ class WikipediaGraphBuilderWithEmbedding:
                 title = data["title"]
                 intro = self._get_intro_text(data["extracted_nodes"])
                 
-                # 格式化用于embedding的文本
                 embedded_text = self.format_embedded_text(title, intro)
                 texts_for_embedding.append(embedded_text)
                 
@@ -103,7 +101,6 @@ class WikipediaGraphBuilderWithEmbedding:
                 print(f"Error parsing line {line_num} in {filename}: {e}")
                 continue
         
-        # 批量计算所有文档的embedding
         if texts_for_embedding:
             try:
                 embeddings = self.get_contriever_embeddings(texts_for_embedding)
@@ -111,23 +108,19 @@ class WikipediaGraphBuilderWithEmbedding:
                 print(f"Error computing embeddings for {filename}: {e}")
                 raise Exception(f"Failed to compute embeddings for {filename}")
             
-            # 为每个文档创建节点和关系
             for i, doc_info in enumerate(processed_docs):
                 title = doc_info["title"]
                 intro = doc_info["intro"]
                 data = doc_info["data"]
                 
-                # 将embedding转换为列表格式存储
                 embedding_list = embeddings[i].numpy().tolist()
                 
-                # 创建节点（包含embedding）
                 create_nodes.append({
                     "title": title,
                     "intro": intro,
                     "embedding": embedding_list
                 })
                 
-                # 处理关系
                 for rel_type in ["see_also_docs", "external_links_docs", "intro_docs"]:
                     if rel_type not in data:
                         continue
@@ -144,9 +137,8 @@ class WikipediaGraphBuilderWithEmbedding:
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                """将一批节点和关系写入Neo4j"""
+                """Write one batch of nodes and relationships to Neo4j."""
                 with self.driver.session() as session:
-                    # 批量创建节点（包含embedding）
                     if nodes:
                         session.run("""
                             UNWIND $nodes AS node
@@ -155,10 +147,11 @@ class WikipediaGraphBuilderWithEmbedding:
                                 d.embedding = node.embedding
                         """, {"nodes": nodes})
                     
-                    # 批量创建关系(无向图，所以创建双向关系)
+                    # Create bidirectional relationships for the undirected graph.
                     # MATCH (a:Document {title: rel.source})
                     # MATCH (b:Document {title: rel.target})
-                    # 对于缺失的目标节点，会创建一个只有title的空节点，后续可以通过其他批次补充intro信息
+                    # Missing target nodes are created with only a title and can be
+                    # enriched by later batches.
                     if rels:
                         session.run("""
                             UNWIND $rels AS rel
@@ -167,29 +160,26 @@ class WikipediaGraphBuilderWithEmbedding:
                             MERGE (a)-[:CONNECTED]->(b)
                             MERGE (b)-[:CONNECTED]->(a)
                         """, {"rels": rels})
-                    break  # 成功则退出循环
+                    break
             except TransientError as e:
                 if "DeadlockDetected" in str(e) and attempt < max_retries - 1:
-                    time.sleep(0.1 * (attempt + 1))  # 指数退避
+                    time.sleep(0.1 * (attempt + 1))
                     continue
-                raise  # 重试次数用尽后重新抛出异常
+                raise
 
     def _calculate_node_degrees(self):
-        """分批计算并更新所有节点的度数"""
-        with self.driver.session(database="neo4j") as session:  # 统一使用一个会话
-            # 获取所有节点总数
+        """Compute and update node degrees in batches."""
+        with self.driver.session(database="neo4j") as session:
             total_result = session.run("MATCH (d:Document) RETURN count(d) as total")
             total_nodes = total_result.single()["total"]
-            print(f"开始计算 {total_nodes} 个节点的度数...")
+            print(f"Computing degrees for {total_nodes} nodes...")
             
-            # 分批处理节点度数计算
             batch_size = 10000
             processed = 0
-            original_batch_size = batch_size  # 保存原始批次大小
+            original_batch_size = batch_size
             
             for skip in range(0, total_nodes, batch_size):
                 try:
-                    # 使用参数化查询增加超时设置
                     session.run("""
                         MATCH (d:Document)
                         WITH d
@@ -197,29 +187,25 @@ class WikipediaGraphBuilderWithEmbedding:
                         OPTIONAL MATCH (d)-[:CONNECTED]->(neighbor)
                         WITH d, count(neighbor) as degree
                         SET d.degree = degree
-                    """, skip=skip, batch_size=batch_size, timeout=60000)  # 60秒超时
+                    """, skip=skip, batch_size=batch_size, timeout=60000)
                     
                     processed += min(batch_size, total_nodes - skip)
-                    print(f"已处理 {processed}/{total_nodes} 个节点 ({processed/total_nodes*100:.1f}%)")
+                    print(f"Processed {processed}/{total_nodes} nodes ({processed/total_nodes*100:.1f}%)")
                     
-                    # 恢复原始批次大小
                     batch_size = original_batch_size
                     
-                    # 根据处理时间动态调整暂停时间
                     if (skip // original_batch_size) % 10 == 0 and skip > 0:
                         time.sleep(2)
                         
                 except Exception as e:
-                    print(f"处理批次 {skip}-{skip+batch_size} 时出错: {str(e)}")
+                    print(f"Error processing batch {skip}-{skip+batch_size}: {str(e)}")
                     import traceback
                     traceback.print_exc()
-                    raise ValueError(f"批次处理失败: {str(e)}")
+                    raise ValueError(f"Batch processing failed: {str(e)}")
                     
             
-            # 分批获取统计信息（对于大型图）
-            print("正在获取度数统计信息...")
+            print("Collecting degree statistics...")
             try:
-                # 使用apoc库的聚合函数或分批次计算统计信息
                 result = session.run("""
                     MATCH (d:Document)
                     WHERE d.degree IS NOT NULL
@@ -231,22 +217,21 @@ class WikipediaGraphBuilderWithEmbedding:
                 
                 stats = result.single()
                 if stats:
-                    print(f"度数统计 - 最小: {stats['min_degree']}, 最大: {stats['max_degree']}, "
-                        f"平均: {stats['avg_degree']:.2f}, 总节点数: {stats['total_nodes']}")
+                    print(f"Degree stats - min: {stats['min_degree']}, max: {stats['max_degree']}, "
+                        f"avg: {stats['avg_degree']:.2f}, total nodes: {stats['total_nodes']}")
             except Exception as e:
-                print(f"获取统计信息时出错: {str(e)}")
+                print(f"Error collecting statistics: {str(e)}")
                 import traceback
                 traceback.print_exc()
-                raise ValueError(f"获取统计信息失败: {str(e)}")
+                raise ValueError(f"Failed to collect statistics: {str(e)}")
         
     def build_graph(self):
-        """构建知识图谱"""
-        # 先创建索引加速后续查询
+        """Build the knowledge graph."""
         with self.driver.session() as session:
             session.run("CREATE INDEX document_title_index IF NOT EXISTS FOR (d:Document) ON (d.title)")
-            print("创建了文档标题索引")
+            print("Created document title index.")
         
-        # 使用线程池并行处理文件（由于embedding需要GPU，建议使用单线程或较少线程）
+        # Keep the worker count low because embedding uses GPU resources.
         with ThreadPoolExecutor(max_workers=1) as executor:
             futures = []
             for filename in os.listdir(self.document_tree_path):
@@ -256,21 +241,19 @@ class WikipediaGraphBuilderWithEmbedding:
                 filepath = os.path.join(self.document_tree_path, filename)
                 futures.append(executor.submit(self._process_file, filepath))
                 
-            # 等待所有任务完成
             for future in tqdm(futures, desc="Processing files"):
                 future.result()
         
-        # 计算并更新节点度数
-        print("正在计算节点度数...")
+        print("Computing node degrees...")
         self._calculate_node_degrees()
 
         
     def _process_file(self, filepath):
-        """处理单个jsonl文件"""
+        """Process one jsonl file."""
         filename = os.path.basename(filepath)
         batch_lines = []
         
-        print(f"开始处理文件: {filename}")
+        print(f"Processing file: {filename}")
         
         with open(filepath, 'r', encoding='utf-8') as f:
             for index, line in enumerate(f):
@@ -281,16 +264,14 @@ class WikipediaGraphBuilderWithEmbedding:
                     self._write_to_neo4j(nodes, rels)
                     batch_lines = []
                     
-                    # 打印进度
                     if (index + 1) % (self.batch_size * 10) == 0:
-                        print(f"已处理 {filename} 的 {index + 1} 行")
+                        print(f"Processed {index + 1} lines from {filename}")
                                     
-            # 处理剩余的行
             if batch_lines:
                 nodes, rels = self._process_batch(filename, batch_lines)
                 self._write_to_neo4j(nodes, rels)
                 
-        print(f"完成处理文件: {filename}")
+        print(f"Finished file: {filename}")
     
     def close(self):
         self.driver.close()

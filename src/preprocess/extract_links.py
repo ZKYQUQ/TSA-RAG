@@ -15,9 +15,6 @@ def remove_redundant_braces(text):
     for match in matches:
         start = match.start()
         end = match.end()
-        # add: consider }} match the end of the line
-        # if start == 0 or (start > 0 and text[start - 1] == "\n"):
-        #     delete_ranges.append((match.start(), match.end()))
         if start == 0 or (start > 0 and text[start - 1] == "\n") or end == len(text) or (end < len(text) and text[end] == "\n"):
             delete_ranges.append((match.start(), match.end()))
 
@@ -44,18 +41,13 @@ def clean_text(text):
     # {{1970s-comedy-film-stub}}
     # {{Poland-film-stub}}
     # {{Infobox...}}
-    # text = remove_nested_braces(text)
     text = remove_redundant_braces(text)
 
     # remove {{cite web|url=...}} --> [16][17] with links and text
     # {{citation|title=...}} with only text
     text = re.sub(r"\{\{[cC]ite ?.*?\}\}", '', text, flags=re.DOTALL)
-    # text = re.sub(r"\{\{[cC]ite ?.*?\}\}\s*$", '', text, flags=re.MULTILINE)
     text = re.sub(r"\{\{[cC]itation.*?\}\}", '', text, flags=re.DOTALL)
-    # text = re.sub(r"\{\{[cC]itation.*?\}\}\s*$", '', text, flags=re.MULTILINE)
 
-    # # remove tables
-    # text = re.sub(r"\{\|.*?\|\}", "", text, flags=re.DOTALL)
     # remove tables double or single layers
     text = re.sub(r"\{\|(?:[^{}]|\{[^{}]*\})*\|\}", "", text, flags=re.DOTALL)
     text = re.sub(r"\{\|.*?\|\}", "", text, flags=re.DOTALL)
@@ -72,12 +64,6 @@ def clean_text(text):
     text = re.sub(r"^\s*\[\[[Ii]mage:.*?\]\]\s*$", "", text, flags=re.MULTILINE)
     text = re.sub(r"\[\[[Ii]mage:.*?\]\]", "", text, flags=re.DOTALL)
 
-    # # remove link brackets, match whole content of the second part, e.g.
-    # # [[Niassa Province]], [[32 Battalion (South Africa)|32 Battalion]], [[2004 Wimbledon Championships|2004]]
-    # # [[Operation Savannah (Angola)#&quot;Bridge 14&quot;|Battle of Bridge 14]]
-    # # text = re.sub(r'\[\[([^|\]]+)(?:\|[^\]]+)?\]\]', r'\1', text)
-    # text = re.sub(r'\[\[([^|\]]+\|)?([^\]]+)\]\]', r'\2', text)
-
     # remove ref tags
     # &lt;ref&gt;...&lt;/ref&gt;--><ref>...</ref>
     # e.g. &lt;ref&gt;{{cite web |...}}
@@ -87,7 +73,6 @@ def clean_text(text):
 
     # remove paired html tags
     text = re.sub(r"<.*?/>", "", text)
-    # text = re.sub(r"<(\w+)[^>]*>.*?</\1>", "", text, flags=re.DOTALL)
     # remove single html tags    &lt;.*?&gt;--><...>    <!--.*?-->
     text = re.sub(r"<.*?>", "", text, flags=re.DOTALL)
     text = re.sub(r"&lt;.*?&gt;", "", text, flags=re.DOTALL)
@@ -96,26 +81,16 @@ def clean_text(text):
     # e.g. &quot;  &amp;  &nbsp;  &lt;
     text = re.sub(r"&[a-zA-Z0-9#]+;", "", text)
 
-    # text = text.replace(r"{{", "")
-    # text = text.replace(r"}}", "")
-
     # remove html links and save last words if exist
     # [https://www.wsj.com/articles... Wall Street Journal]
     # [https://www.wsj.com/articles...]
     text = re.sub(r"\[https?:\/\/[^\] ]+(?: ([^\]]+))?\]", lambda m: m.group(1) if m.group(1) else "", text)
 
     # remove single line start with | ! { }
-    # text = re.sub(r"^\s*\|.*$", "", text, flags=re.MULTILINE)
     text = re.sub(r"^\s*[|!{}].*$", "", text, flags=re.MULTILINE)
 
     # remove extra \n
     text = re.sub(r"\n+", "\n", text).strip()
-
-    # # todo: save and clean infoboxes & tables e.g.
-    # # infobox: {{Infobox newspaper, {{Infobox video game, {{infobox...{{...}}...}}
-    # # table: {|...|}
-    # text = re.sub("[ |\|]?class= ?.*?[\n|\|]", " ", text)
-    # text = re.sub("[-|\|] ?style= ?.*?[\n|\|]", "", text)
 
     return text
 
@@ -226,7 +201,6 @@ def add_intro_links(text):
         if match_title:
             break
 
-        # text = re.sub(r'\[\[([^|\]]+\|)?([^\]]+)\]\]', r'\2', text)
         wiki_links = re.findall(r'\[\[([^|\]]+\|)?([^\]]+)\]\]', part)
         
         # [[xxx]] [[xxx|xxx]]
@@ -248,10 +222,6 @@ def extract_linked_docs(jsonl_file, output_jsonl_file, title_lower_to_original):
             raw_text = data.get('raw_text')
             raw_see_also_docs, raw_external_links_docs = extract_text_links(raw_text)
             raw_intro_docs = add_intro_links(raw_text)
-
-            # see_also_docs = [doc for doc in raw_see_also_docs if doc in titles_set]
-            # external_links_docs = [doc for doc in raw_external_links_docs if doc in titles_set]            
-            # intro_docs = [doc for doc in raw_intro_docs if doc in titles_set]
 
             see_also_docs = []
             for doc in raw_see_also_docs:
@@ -302,7 +272,6 @@ def process_single_file(jsonl_file, output_folder, title_lower_to_original):
 def process_files(input_folder, output_folder, index_file, max_workers=None):
     with open(index_file, 'r', encoding='utf-8') as f:
         title_index = json.load(f)
-        # titles_set = set(title_index.keys())
         title_lower_to_original = {title.lower(): title for title in title_index.keys()}
 
     if not os.path.exists(output_folder):

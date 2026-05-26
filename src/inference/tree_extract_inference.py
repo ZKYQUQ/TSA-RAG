@@ -37,19 +37,16 @@ class DocumentTree:
         self.root = self.build_document_tree(raw_data)
     
     def build_document_tree(self, raw_data: dict):
-        """构建文档树"""
+        """Build the document tree."""
         self.nodes = {}
         self.leaves = []
         
-        # 创建所有节点
         for data in raw_data["extracted_nodes"]:
             node = TreeNode(data["id"], data["text"], data["type"], data["span"])
             
-            # 根节点（title）和intro内容点亮
             if data["id"] == 0 or (self.with_intro and data["type"] == "content" and data["relation"]["up_id"] == 0):
                 node.lighted = True
             
-            # 记录叶子节点
             if len(data["relation"]["down_ids"]) == 0:
                 self.leaves.append(node)
                 
@@ -57,7 +54,6 @@ class DocumentTree:
         
         self.nodes[0].text = "=" + self.nodes[0].text + "="
 
-        # 建立父子关系
         for data in raw_data["extracted_nodes"]:
             current_node = self.nodes[data["id"]]
             up_id = data["relation"]["up_id"]
@@ -66,10 +62,8 @@ class DocumentTree:
                 parent_node = self.nodes[up_id]
                 parent_node.add_child(current_node)
         
-        # 排序叶子节点
         self.leaves.sort(key=lambda x: x.id)
         
-        # 找到根节点
         root = None
         for node in self.nodes.values():
             if node.parent is None:
@@ -79,19 +73,19 @@ class DocumentTree:
         return root
     
     def get_siblings(self, node):
-        """获取节点的兄弟节点"""
+        """Return siblings for a node."""
         if node.parent:
             return node.parent.children
         return [node]
     
     def light_heading_descendants(self, node):
-        """递归点亮节点的所有后代"""
+        """Mark all descendants of a heading as lighted."""
         for child in node.children:
             child.lighted = True
             self.light_heading_descendants(child)
     
     def light_nodes_by_heading_ids(self, heading_ids):
-        """根据heading IDs点亮相关节点"""
+        """Mark nodes related to the selected heading ids as lighted."""
         for heading_id in heading_ids:
             if heading_id not in self.nodes:
                 continue
@@ -102,20 +96,15 @@ class DocumentTree:
                 
             target_node = self.nodes[heading_id]
             
-            # 点亮目标节点
             target_node.lighted = True
             
-            # 点亮所有后代节点
             self.light_heading_descendants(target_node)
             
-            # 向上点亮到根节点
             current_node = target_node
             while current_node.parent is not None:
                 current_node = current_node.parent
                 current_node.lighted = True
                 
-                # 如果启用include_parent_siblings，点亮title节点的content兄弟节点
-                # if self.include_parent_siblings and current_node.type == "title":
                 if self.include_parent_siblings:
                     siblings = self.get_siblings(current_node)
                     for sibling in siblings:
@@ -123,27 +112,23 @@ class DocumentTree:
                             sibling.lighted = True
     
     def format_data(self, node, level: int = 0):
-        """格式化节点数据"""
+        """Format one node."""
         if node.type == "title":
-            # 对于标题节点，保持原有的=格式
             return f"{node.id}: {node.text}"
         elif node.type == "content":
-            # 对于内容节点，直接显示文本
             return f"{node.id}: {node.text}"
         else:
             return f"{node.id}: {node.text}"
     
     def traverse(self, node=None, level: int = 0, result: str = ""):
-        """遍历并格式化文档树"""
+        """Traverse and format the document tree."""
         if node is None:
             node = self.root
             
         if node.lighted:
-            # 添加缩进
             indent = "    " * level
             result += indent + self.format_data(node, level) + "\n"
             
-            # 遍历子节点
             for child in node.children:
                 if child.lighted:
                     result = self.traverse(child, level + 1, result)
@@ -151,10 +136,9 @@ class DocumentTree:
         return result
 
 def load_existing_results(output_file):
-    """加载已有的结果文件"""
+    """Load existing results."""
     if os.path.exists(output_file):
         try:
-            # 确定query字段
             if "asqa" in output_file:
                 query_str = 'ambiguous_question'
             elif "eli5" in output_file:
@@ -173,16 +157,8 @@ def load_existing_results(output_file):
             return None, set()
     return None, set()
 
-# def save_batch_results(all_processed_rows, output_file):
-#     """保存批次结果"""
-#     if all_processed_rows:
-#         result_df = pd.DataFrame(all_processed_rows)
-#         result_df.to_parquet(output_file, index=False)
-#         print(f"Saved {len(all_processed_rows)} results to {output_file}")
-
 def atomic_write_parquet(df, output_path):
-        """原子性写入parquet文件"""
-        # 创建临时文件
+        """Atomically write a Parquet file."""
         temp_dir = os.path.dirname(output_path)
         temp_file = tempfile.NamedTemporaryFile(
             dir=temp_dir, 
@@ -193,28 +169,24 @@ def atomic_write_parquet(df, output_path):
         temp_file.close()
         
         try:
-            # 写入临时文件
-            print(f"写入临时文件: {temp_path}")
+            print(f"Writing temporary file: {temp_path}")
             df.to_parquet(temp_path, index=False)
             
-            # 原子性移动到最终位置
-            print(f"移动到最终文件: {output_path}")
+            print(f"Moving to final file: {output_path}")
             shutil.move(temp_path, output_path)
-            print(f"成功保存到: {output_path}")
+            print(f"Saved to: {output_path}")
             
         except Exception as e:
-            # 清理临时文件
             if os.path.exists(temp_path):
                 os.remove(temp_path)
-                print(f"清理临时文件: {temp_path}")
+                print(f"Removed temporary file: {temp_path}")
             raise e
     
 def save_batch_results(processed_rows, output_path):
-    """保存批次结果"""
+    """Save a batch of processed rows."""
     if processed_rows:
         batch_df = pd.DataFrame(processed_rows)
         
-        # 如果输出文件已存在，则追加
         if os.path.exists(output_path):
             existing_df = pd.read_parquet(output_path)
             combined_df = pd.concat([existing_df, batch_df], ignore_index=True)
@@ -222,10 +194,10 @@ def save_batch_results(processed_rows, output_path):
         else:
             atomic_write_parquet(batch_df, output_path)
 
-        print(f"保存了 {len(processed_rows)} 条记录")
+        print(f"Saved {len(processed_rows)} records.")
 
 def extract_document_subtrees(input_file, output_file, with_intro=True, include_parent_siblings=True, batch_size=100, plain_tree=False):
-    """构建document subtrees"""
+    """Build document subtrees."""
     
     def build_plain_doc_info(source_doc_info):
         doc_info_copy = copy.deepcopy(source_doc_info)
@@ -257,11 +229,9 @@ def extract_document_subtrees(input_file, output_file, with_intro=True, include_
         headings = [node["id"] for node in doc_info_copy["extracted_nodes"]]
         return doc_info_copy, headings
     
-    # 读取输入数据
     print("Loading input data...")
     df = pd.read_parquet(input_file)
     
-    # 确定query字段
     if "asqa" in input_file:
         query_str = 'ambiguous_question'
     elif "eli5" in input_file:
@@ -270,12 +240,9 @@ def extract_document_subtrees(input_file, output_file, with_intro=True, include_
         query_str = 'question_text'
     else:
         query_str = 'question'
-        # raise ValueError("Unsupported input file type for document subtree extraction")
     
-    # 加载已有结果
     existing_df, processed_sample_queries = load_existing_results(output_file)
     
-    # 过滤未处理的数据
     if processed_sample_queries:
         unprocessed_mask = ~df[query_str].isin(processed_sample_queries)
         unprocessed_df = df[unprocessed_mask].reset_index(drop=True)
@@ -288,11 +255,6 @@ def extract_document_subtrees(input_file, output_file, with_intro=True, include_
         print("All samples have been processed!")
         return
     
-    # # 处理数据
-    # all_processed_rows = []
-    # if existing_df is not None:
-    #     all_processed_rows = existing_df.to_dict('records')
-    
     batch_processed = []
     
     for idx, row in tqdm(unprocessed_df.iterrows(), total=len(unprocessed_df), desc="Processing samples"):
@@ -301,7 +263,6 @@ def extract_document_subtrees(input_file, output_file, with_intro=True, include_
             path_extract_results = row.get('path_extract_results', [])
             doc_infos = row.get('doc_infos', [])
             
-            # 构建文档标题到doc_info的映射
             doc_info_map = {}
             for doc_info in doc_infos:
                 title = doc_info.get('title', '')
@@ -310,7 +271,6 @@ def extract_document_subtrees(input_file, output_file, with_intro=True, include_
             
             document_subtrees = []
             
-            # 处理每个path extract结果
             for extract_result in path_extract_results:
                 doc_title = extract_result.get('title', '')
                 headings = extract_result.get('headings', [])
@@ -318,14 +278,12 @@ def extract_document_subtrees(input_file, output_file, with_intro=True, include_
                 if not doc_title or len(headings) == 0:
                     continue
                 
-                # 查找对应的doc_info
                 if doc_title not in doc_info_map:
                     raise ValueError(f"Warning: Document '{doc_title}' not found in doc_infos")
                     continue
                 
                 doc_info = doc_info_map[doc_title]
                 
-                # 构建DocumentTree
                 try:
                     if plain_tree:
                         doc_info_for_tree, headings = build_plain_doc_info(doc_info)
@@ -334,13 +292,11 @@ def extract_document_subtrees(input_file, output_file, with_intro=True, include_
                     
                     doc_tree = DocumentTree(doc_info_for_tree, with_intro=with_intro, include_parent_siblings=include_parent_siblings)
                     
-                    # 点亮指定的headings
                     doc_tree.light_nodes_by_heading_ids(headings)
                     
-                    # 生成文档树的文本表示
                     tree_text = doc_tree.traverse()
                     
-                    if tree_text.strip():  # 只保存非空的树
+                    if tree_text.strip():
                         document_subtrees.append({
                             "title": doc_title,
                             # "doc_info": doc_info,
@@ -353,30 +309,16 @@ def extract_document_subtrees(input_file, output_file, with_intro=True, include_
                     print(f"Error processing document tree for '{doc_title}': {e}")
                     continue
             
-            # 添加新字段
             new_row['document_subtrees'] = document_subtrees
             
             batch_processed.append(new_row)
             
-            # # 每batch_size条数据保存一次
-            # if len(batch_processed) >= batch_size:
-            #     # all_processed_rows.extend(batch_processed)
-            #     # save_batch_results(all_processed_rows, output_file)
-            #     # batch_processed = []
-            #     # print(f"Processed {idx + 1}/{len(unprocessed_df)} samples")
-            #     save_batch_results(batch_processed, output_file)
-            #     batch_processed = []  # 清空缓存
-
         except Exception as e:
             print(f"Error processing sample {idx}: {e}")
             continue
     
-    # 保存剩余的数据
     if batch_processed:
-        # all_processed_rows.extend(batch_processed)
-        # save_batch_results(all_processed_rows, output_file)
         save_batch_results(batch_processed, output_file)
-        # batch_processed = []  # 清空缓存
 
     print(f"Document subtree construction complete! Results saved to {output_file}")
 
@@ -395,21 +337,19 @@ def construct_tree_extract_prompt(document_tree, question):
 
 def model_inference(input_file, output_file, model_path, max_new_tokens=512, batch_size=10):
     """
-    针对document_subtrees字段进行模型推理，添加tree_extract_results字段
+    Run model inference over document_subtrees and add tree_extract_results.
     
     Args:
-        input_file: 输入的parquet文件路径
-        output_file: 输出的parquet文件路径
-        model_path: 模型路径
-        max_new_tokens: 最大生成token数量
-        batch_size: 批处理大小
+        input_file: Input Parquet file path.
+        output_file: Output Parquet file path.
+        model_path: Model path.
+        max_new_tokens: Maximum number of generated tokens.
+        batch_size: Batch size.
     """
     
-    # 读取输入数据
     print("Loading input data...")
     df = pd.read_parquet(input_file)
     
-    # 确定query字段
     if "asqa" in input_file:
         query_str = 'ambiguous_question'
     elif "eli5" in input_file:
@@ -418,12 +358,9 @@ def model_inference(input_file, output_file, model_path, max_new_tokens=512, bat
         query_str = 'question_text'
     else:
         query_str = 'question'
-        # raise ValueError("Unsupported input file type for model inference")
     
-    # 加载已有结果
     existing_df, processed_sample_queries = load_existing_results(output_file)
     
-    # 过滤未处理的数据
     if processed_sample_queries:
         unprocessed_mask = ~df[query_str].isin(processed_sample_queries)
         unprocessed_df = df[unprocessed_mask].reset_index(drop=True)
@@ -436,7 +373,6 @@ def model_inference(input_file, output_file, model_path, max_new_tokens=512, bat
         print("All samples have been processed!")
         return
     
-    # 初始化模型pipeline
     print(f"Loading model from {model_path}...")
     pipeline = transformers.pipeline(
         "text-generation",
@@ -446,11 +382,6 @@ def model_inference(input_file, output_file, model_path, max_new_tokens=512, bat
     )
     
 
-    # # 处理数据
-    # all_processed_rows = []
-    # if existing_df is not None:
-    #     all_processed_rows = existing_df.to_dict('records')
-    
     batch_processed = []
     
     for idx, row in tqdm(unprocessed_df.iterrows(), total=len(unprocessed_df), desc="Processing samples"):
@@ -459,7 +390,6 @@ def model_inference(input_file, output_file, model_path, max_new_tokens=512, bat
             question = row[query_str]
             document_subtrees = row.get('document_subtrees', [])
             
-            # 对每个文档子树进行推理
             tree_extract_results = []
             
             for subtree in document_subtrees:
@@ -471,56 +401,39 @@ def model_inference(input_file, output_file, model_path, max_new_tokens=512, bat
                 if not title or not document_tree:
                     continue
                 
-                # 构造推理prompt
                 prompt = construct_tree_extract_prompt(document_tree, question)
                 
-                # 模型推理
                 messages = [{"role": "user", "content": prompt}]
                 
                 preds = pipeline(
                     messages,
                     max_new_tokens=max_new_tokens,
-                    # do_sample=False,
-                    # temperature=0.0,
                 )
                 raw_output = preds[0]["generated_text"][-1]["content"]
                 
-                # 保存结果
                 tree_extract_results.append({
                     "title": title,
                     "doc_info": doc_info,
-                    # "path_extract_headings": path_extract_headings,
-                    # "document_tree": document_tree,
                     "raw_output": raw_output,
                     "local_score": doc_info.get("local_score", 0),
                     "global_score": doc_info.get("global_score", 0),
                     "total_score": doc_info.get("total_score", 0)
                 })
             
-            # 添加新字段
             new_row['tree_extract_results'] = tree_extract_results
             
             batch_processed.append(new_row)
             
-            # 每batch_size条数据保存一次
             if len(batch_processed) >= batch_size:
-                # all_processed_rows.extend(batch_processed)
-                # save_batch_results(all_processed_rows, output_file)
-                # batch_processed = []
-                # print(f"Processed {idx + 1}/{len(unprocessed_df)} samples")
                 save_batch_results(batch_processed, output_file)
-                batch_processed = []  # 清空缓存
+                batch_processed = []
 
         except Exception as e:
             print(f"Error processing sample {idx}: {e}")
             continue
     
-    # 保存剩余的数据
     if batch_processed:
-        # all_processed_rows.extend(batch_processed)
-        # save_batch_results(all_processed_rows, output_file)
         save_batch_results(batch_processed, output_file)
-        # batch_processed = []  # 清空缓存
 
     print(f"Tree extract model inference complete! Results saved to {output_file}")
 
@@ -536,11 +449,9 @@ def parse_model_output(raw_output):
         if not line:
             continue
         
-        # 检查是否是段落行
         if line.startswith('[paragraph]'):
             paragraph_content = line[len('[paragraph]'):].strip()
             
-            # 解析paragraph_id
             parts = paragraph_content.split(':', 1)
             if len(parts) == 2:
                 try:
@@ -554,18 +465,16 @@ def parse_model_output(raw_output):
 
 def parse_and_filter_results(input_file, output_file, batch_size=10, subtree_with_intro=False, subtree_include_parent_siblings=False):
     """
-    解析tree_extract_results中的raw_output，过滤内容并构造子树
+    Parse raw_output in tree_extract_results, filter paragraphs, and build subtrees.
     
     Args:
-        input_file: 输入的parquet文件路径
-        output_file: 输出的parquet文件路径
-        batch_size: 批处理大小
+        input_file: Input Parquet file path.
+        output_file: Output Parquet file path.
+        batch_size: Batch size.
     """
-    # 读取输入数据
     print("Loading input data...")
     df = pd.read_parquet(input_file)
     
-    # 确定query字段
     if "asqa" in input_file:
         query_str = 'ambiguous_question'
     elif "eli5" in input_file:
@@ -574,12 +483,9 @@ def parse_and_filter_results(input_file, output_file, batch_size=10, subtree_wit
         query_str = 'question_text'
     else:
         query_str = 'question'
-        # raise ValueError("Unsupported input file type for parsing and filtering results")
     
-    # 加载已有结果
     existing_df, processed_sample_queries = load_existing_results(output_file)
     
-    # 过滤未处理的数据
     if processed_sample_queries:
         unprocessed_mask = ~df[query_str].isin(processed_sample_queries)
         unprocessed_df = df[unprocessed_mask].reset_index(drop=True)
@@ -592,11 +498,6 @@ def parse_and_filter_results(input_file, output_file, batch_size=10, subtree_wit
         print("All samples have been processed!")
         return
     
-    # # 处理数据
-    # all_processed_rows = []
-    # if existing_df is not None:
-    #     all_processed_rows = existing_df.to_dict('records')
-    
     batch_processed = []
     
     for idx, row in tqdm(unprocessed_df.iterrows(), total=len(unprocessed_df), desc="Processing samples"):
@@ -604,27 +505,21 @@ def parse_and_filter_results(input_file, output_file, batch_size=10, subtree_wit
             new_row = copy.deepcopy(row)
             tree_extract_results = row.get('tree_extract_results', [])
             
-            # 处理每个树提取结果
             for i, result in enumerate(tree_extract_results):
-                # 检查是否已处理过
                 if 'cleaned_output' in result and 'formated_subtree' in result:
                     continue
                 
                 raw_output = result.get('raw_output', '')
                 doc_info = result.get('doc_info', {})
                 
-                # 解析模型输出
                 paragraph_ids = parse_model_output(raw_output)
                 
-                # 验证并过滤paragraph_ids
                 valid_paragraph_ids = []
                 
                 try:
-                    # 使用DocumentTree验证节点
                     doc_tree = DocumentTree(doc_info, with_intro=True, include_parent_siblings=True)
                     
                     for paragraph_id in paragraph_ids:
-                        # 检查节点是否存在且为content类型
                         if paragraph_id in doc_tree.nodes and doc_tree.nodes[paragraph_id].type == 'content':
                             valid_paragraph_ids.append(paragraph_id)
                             
@@ -632,32 +527,24 @@ def parse_and_filter_results(input_file, output_file, batch_size=10, subtree_wit
                     print(f"Error validating paragraphs: {e}")
                     valid_paragraph_ids = []
                 
-                # 保存清洗后的结果
                 new_row['tree_extract_results'][i]['cleaned_output'] = sorted(valid_paragraph_ids)
                 
-                # 对于非空结果，构建格式化子树
                 if valid_paragraph_ids:
                     try:
-                        # 创建新的DocumentTree实例
                         doc_tree = DocumentTree(doc_info, with_intro=subtree_with_intro, include_parent_siblings=subtree_include_parent_siblings)
                         
-                        # 重置所有节点的lighted状态为False
                         for node_id in doc_tree.nodes:
                             doc_tree.nodes[node_id].lighted = False
                         
-                        # 点亮指定的paragraph节点及其所有父节点
                         for paragraph_id in valid_paragraph_ids:
                             if paragraph_id in doc_tree.nodes:
-                                # 点亮节点
                                 doc_tree.nodes[paragraph_id].lighted = True
                                 
-                                # 向上点亮所有父节点
                                 current_node = doc_tree.nodes[paragraph_id]
                                 while current_node.parent is not None:
                                     current_node = current_node.parent
                                     current_node.lighted = True
                         
-                        # 生成格式化子树
                         formated_subtree = doc_tree.traverse()
                         new_row['tree_extract_results'][i]['formated_subtree'] = formated_subtree
                     
@@ -665,10 +552,8 @@ def parse_and_filter_results(input_file, output_file, batch_size=10, subtree_wit
                         print(f"Error generating formatted subtree: {e}")
                         new_row['tree_extract_results'][i]['formated_subtree'] = ""
                 else:
-                    # 如果没有有效段落，设置为空字符串
                     new_row['tree_extract_results'][i]['formated_subtree'] = ""
             
-            # 按total_score排序tree_extract_results
             new_row['tree_extract_results'] = sorted(
                 new_row['tree_extract_results'], 
                 key=lambda x: x['total_score'], 
@@ -677,90 +562,72 @@ def parse_and_filter_results(input_file, output_file, batch_size=10, subtree_wit
             
             batch_processed.append(new_row)
             
-            # # 每batch_size条数据保存一次
-            # if len(batch_processed) >= batch_size:
-            #     # all_processed_rows.extend(batch_processed)
-            #     # save_batch_results(all_processed_rows, output_file)
-            #     # batch_processed = []
-            #     # print(f"Processed {idx + 1}/{len(unprocessed_df)} samples")
-            #     save_batch_results(batch_processed, output_file)
-            #     batch_processed = []  # 清空缓存
-
         except Exception as e:
             print(f"Error processing sample {idx}: {e}")
             continue
     
-    # 保存剩余的数据
     if batch_processed:
-        # all_processed_rows.extend(batch_processed)
-        # save_batch_results(all_processed_rows, output_file)
         save_batch_results(batch_processed, output_file)
-        # batch_processed = []  # 清空缓存
 
     print(f"Parse and filter complete! Results saved to {output_file}")
 
 def main():
     parser = argparse.ArgumentParser(description='Tree Extract Inference Pipeline')
     
-    # 必需参数
     parser.add_argument('--input_file', '-i', 
                         type=str, 
                         required=True,
-                        help='输入的parquet文件路径')
+                        help='Input Parquet file path.')
     
     parser.add_argument('--output_file', '-o', 
                         type=str, 
                         required=True,
-                        help='输出的parquet文件路径')
+                        help='Output Parquet file path.')
     
     parser.add_argument('--substage', 
                         type=str, 
                         required=True,
                         choices=['extract_document_subtrees', 'inference', 'parse_and_filter'],
-                        help='处理阶段')
+                        help='Processing substage.')
     
     parser.add_argument('--subtree_with_intro',
                         type=bool,
                         default=False,
-                        help='是否包含intro内容节点')
+                        help='Whether to include intro content nodes.')
 
     parser.add_argument('--subtree_include_parent_siblings',
                         type=bool,
                         default=False,
-                        help='在向上点亮过程中是否包含父节点的content类型兄弟节点')
+                        help='Whether to include content-type siblings of parent nodes while lighting ancestors.')
 
     parser.add_argument('--plain_tree',
                         type=bool,
                         default=False,
-                        help='是否仅保留标题节点及所有内容节点构建两层树')
+                        help='Whether to keep only the title node and all content nodes as a two-level tree.')
 
-    # inference 阶段参数
     parser.add_argument('--model_path', 
                         type=str,
-                        help='模型路径（inference阶段需要）')
+                        help='Model path required for inference.')
     
     parser.add_argument('--max_new_tokens', 
                         type=int, 
                         default=512,
-                        help='最大新生成token数（inference阶段）')
+                        help='Maximum new tokens for inference.')
     
-    # 通用参数
     parser.add_argument('--batch_size', 
                         type=int, 
                         default=10,
-                        help='批处理大小')
+                        help='Batch size.')
     
     args = parser.parse_args()
 
-    # 打印全部参数
     for arg, value in vars(args).items():
         print(f"{arg}: {value}")
     
-    # 创建输出目录（如果不存在）
     output_dir = os.path.dirname(args.output_file)
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
-        print(f"创建输出目录: {output_dir}")
+        print(f"Created output directory: {output_dir}")
     
     if args.substage == 'extract_document_subtrees':
         extract_document_subtrees(
@@ -773,7 +640,7 @@ def main():
         )
     elif args.substage == 'inference':
         if not args.model_path:
-            raise ValueError("inference阶段需要提供model_path参数")
+            raise ValueError("inference requires model_path.")
         
         model_inference(
             input_file=args.input_file,

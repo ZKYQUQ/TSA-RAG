@@ -210,8 +210,6 @@ def compute_qa(data):
     # Load model
     logger.info("Loading the RoBERTa-large SQuAD model for QA-based accuracy...")
     qa_pipeline = pipeline("question-answering", model=QA_MODEL, device=1)
-    # qa_pipeline = pipeline("question-answering", model=QA_MODEL, device="auto")
-    # qa_pipeline = pipeline("question-answering", model=QA_MODEL)
     logger.info("Done")
 
     # Get prediction
@@ -260,7 +258,6 @@ def compute_mauve(data):
         p_text=human_data,
         q_text=model_data,
         device_id=1,
-        # device_id="auto",
         max_text_length=512,
         verbose=True,
         batch_size=8,
@@ -288,7 +285,6 @@ def compute_claims(data):
     global autoais_model, autoais_tokenizer
     if autoais_model is None:
         logger.info("Loading AutoAIS model...")
-        # autoais_model = AutoModelForSeq2SeqLM.from_pretrained(AUTOAIS_MODEL, torch_dtype=torch.bfloat16, max_memory=get_max_memory(), device_map="auto")
         autoais_model = AutoModelForSeq2SeqLM.from_pretrained(AUTOAIS_MODEL, torch_dtype=torch.bfloat16, max_memory=get_max_memory(), device_map={"": "cuda:1"})
         autoais_tokenizer = AutoTokenizer.from_pretrained(AUTOAIS_MODEL, use_fast=False)
 
@@ -308,7 +304,6 @@ def compute_claims_with_individual_socres(data):
     global autoais_model, autoais_tokenizer
     if autoais_model is None:
         logger.info("Loading AutoAIS model...")
-        # autoais_model = AutoModelForSeq2SeqLM.from_pretrained(AUTOAIS_MODEL, torch_dtype=torch.bfloat16, max_memory=get_max_memory(), device_map="auto")
         autoais_model = AutoModelForSeq2SeqLM.from_pretrained(AUTOAIS_MODEL, torch_dtype=torch.bfloat16, max_memory=get_max_memory(), device_map={"": "cuda:1"})
         autoais_tokenizer = AutoTokenizer.from_pretrained(AUTOAIS_MODEL, use_fast=False)
 
@@ -474,9 +469,6 @@ def save_compute_qampari_f1(data, cot=False):
         else:
             o = item['output']
         preds = [normalize_answer(x.strip()) for x in o.rstrip().rstrip(".").rstrip(",").split(",")]
-        # preds = [normalize_answer(x.strip()) for x in o.rstrip().rstrip(".").rstrip(",").replace('.', ',').split(",")]
-        
-        # print(preds)
         preds = [p for p in preds if len(p) > 0] # delete empty answers
         num_preds.append(len(preds))
         answers = [[normalize_answer(x) for x in ans] for ans in item['answers']]
@@ -486,15 +478,6 @@ def save_compute_qampari_f1(data, cot=False):
         rec.append(sum([any([x in preds for x in a]) for a in answers]) / len(answers))
         rec_top5.append(min(5, sum([any([x in preds for x in a]) for a in answers])) / min(5, len(answers)))
         
-    #    # 使用包含关系计算精确率：对于每个预测p，检查是否有任何标准答案a是p的子字符串
-    #     prec.append(sum([any(a in p for a in flat_answers) for p in preds]) / len(preds) if len(preds) > 0 else 0)
-        
-    #     # 使用包含关系计算召回率：对于每个答案组a，检查其中是否有任何答案x是任何预测p的子字符串
-    #     recalled_answers_count = sum([any(x in p for x in a for p in preds) for a in answers])
-    #     rec.append(recalled_answers_count / len(answers))
-    #     rec_top5.append(min(5, recalled_answers_count) / min(5, len(answers)))
-
-
         if (prec[-1] + rec[-1]) == 0:
             f1.append(0)
         else:
@@ -620,9 +603,8 @@ def post_qampari_answer(data):
         for ans in candidates:
             ans = ans.strip().strip('"').strip("'").strip()
             ans = re.sub(r'\([^)]*\)', '', ans)
-            # ans = re.sub(r'\[[^]]*\]', '', ans)
             ans = ans.strip()
-            if ans:  # 非空才保留
+            if ans:
                 cleaned_answers.append(ans)
         
         final_output = ', '.join(cleaned_answers)
@@ -632,34 +614,6 @@ def post_qampari_answer(data):
             print("\nfinal_output_", flag, " is:", final_output)
     
     return post_data
-
-# def post_qampari_answer(data):
-#     item = copy.deepcopy(data)
-#     question = item["question_text"]
-#     raw_output = item["reader"]["answer"]
-    
-#     pattern = r'^(\s*)([\*\+]|\d+\.)\s+(.*)$'
-#     matches = re.findall(pattern, raw_output, flags=re.MULTILINE)
-    
-#     candidates = []
-#     for match in matches:
-#         _, prefix, content = match
-#         if not ('Q' in content or content.strip() in question):
-#             candidates.append(content.strip())
-    
-#     cleaned_answers = []
-#     for ans in candidates:
-#         ans = ans.strip().strip('"').strip("'").strip()
-#         ans = re.sub(r'\([^)]*\)', '', ans)
-#         # ans = re.sub(r'\[[^]]*\]', '', ans)
-#         ans = ans.strip()
-#         if ans:  # 非空才保留
-#             cleaned_answers.append(ans)
-    
-#     final_output = ', '.join(cleaned_answers)
-    
-#     return final_output
-
 
 def main():
     parser = argparse.ArgumentParser()

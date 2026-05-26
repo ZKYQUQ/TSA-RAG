@@ -10,7 +10,6 @@ def construct_file_index(jsonl_dir, output_index_file):
     title_index = {}
 
     for filename in os.listdir(jsonl_dir):
-        # if filename.endswith(".jsonl"):
         if '.jsonl' in filename:
             filepath = os.path.join(jsonl_dir, filename)
             

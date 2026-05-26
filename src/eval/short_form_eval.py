@@ -35,15 +35,12 @@ def calculate_acc(parquet_path):
     Returns:
         Accuracy score (float)
     """
-    #df = pq.read_table(parquet_path).to_pandas()
     df = pd.read_json(parquet_path)
     correct = 0
     total = len(df)
     
     for _, row in df.iterrows():
         golden_answers = row['golden_answers'] if "golden_answers" in row else row["answers"]
-        # model_answer = row['reader']['answer']
-        # model_answer = row['output']
         model_answer = row['output'].strip("\n., ")
         # Normalize both model answer and golden answers
         norm_model_answer = normalize_answer(model_answer)
@@ -65,14 +62,12 @@ def calculate_em(parquet_path):
     Returns:
         Accuracy score (float)
     """
-    #df = pq.read_table(parquet_path).to_pandas()
     df = pd.read_json(parquet_path)
     correct = 0
     total = len(df)
     
     for _, row in df.iterrows():
         golden_answers = row['golden_answers'] if "golden_answers" in row else row["answers"]
-        # model_answer = row['reader']['answer']
         model_answer = row['output'].strip("\n., ")
         # Normalize both model answer and golden answers
         norm_model_answer = normalize_answer(model_answer)
@@ -124,7 +119,6 @@ def calculate_char_f1(parquet_path):
     Returns:
         Average character-level F1 score (float)
     """
-    #df = pq.read_table(parquet_path).to_pandas()
     df = pd.read_json(parquet_path)
     precision_scores = []
     recall_scores = []
@@ -132,7 +126,6 @@ def calculate_char_f1(parquet_path):
     
     for _, row in df.iterrows():
         golden_answers = row['golden_answers'] if "golden_answers" in row else row["answers"]
-        # model_answer = row['reader']['answer']
         model_answer = row['output'].strip("\n., ")
         metrics = token_level_f1(model_answer, golden_answers)
         precision_scores.append(metrics['precision'])
@@ -150,15 +143,12 @@ def calculate_char_f1(parquet_path):
 
 
 def find_and_save_special_cases(parquet_path):
-    # 读取parquet文件
-    #df = pq.read_table(parquet_path).to_pandas()
     df = pd.read_json(parquet_path)
     em_special_cases = []
     em_special_rows = []
     
     for _, row in tqdm(df.iterrows(), total=len(df), desc="Processing samples"):
         golden_answers = row['golden_answers'] if "golden_answers" in row else row["answers"]
-        # model_answer = row['reader']['answer']
         model_answer = row['output'].strip("\n., ")
         norm_model_answer = normalize_answer(model_answer)
         norm_golden_answers = [normalize_answer(ans) for ans in golden_answers if normalize_answer(ans)]
@@ -173,7 +163,6 @@ def find_and_save_special_cases(parquet_path):
             acc_flag = True
             
         if em_flag and not acc_flag:
-            # 准备JSONL数据
             special_case = {
                 "question": row['question'],
                 "model_answer": norm_model_answer,
@@ -183,25 +172,21 @@ def find_and_save_special_cases(parquet_path):
             }
             em_special_cases.append(special_case)
             
-            # 准备Parquet数据（去除reader字段）
             parquet_row = row.to_dict()
             del parquet_row['reader']
             em_special_rows.append(parquet_row)
     
     print(f"EM == True && Acc == False: {len(em_special_cases)}")
     
-    # 保存EM特殊案例到JSONL文件
     output_jsonl_path = parquet_path.replace('.parquet', '_em_special_cases.jsonl')
     with open(output_jsonl_path, 'w', encoding='utf-8') as f:
         for case in em_special_cases:
             f.write(json.dumps(case, ensure_ascii=False) + '\n')
     
-    # 保存EM特殊案例到Parquet文件
     if em_special_rows:
         output_parquet_path = parquet_path.replace('.parquet', '_em_special_cases.parquet')
         special_df = pd.DataFrame(em_special_rows)
         
-        # 确保列数据类型与原始数据一致
         original_schema = pq.read_schema(parquet_path)
         new_schema = pa.schema([field for field in original_schema if field.name != 'reader'])
         
@@ -211,24 +196,22 @@ def find_and_save_special_cases(parquet_path):
 
 def read_json_file(json_path):
     """
-    读取JSON文件并返回DataFrame格式数据
+    Read a JSON file and return it as a DataFrame.
     
     Args:
-        json_path: JSON文件路径
+        json_path: JSON file path
         
     Returns:
-        pandas.DataFrame: 包含JSON数据的DataFrame
+        pandas.DataFrame: DataFrame containing the JSON data
     """
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
-    # 转换为DataFrame
     df = pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame([data])
     
     return df
 
 def find_and_save_special_cases_json(json_path):
-    # 读取json文件
     df = read_json_file(json_path)
     
     em_special_cases = []
@@ -251,7 +234,6 @@ def find_and_save_special_cases_json(json_path):
             acc_flag = True
             
         if em_flag and not acc_flag:
-            # 准备JSONL数据
             special_case = {
                 "question": row['question'],
                 "model_answer": norm_model_answer,
@@ -261,20 +243,17 @@ def find_and_save_special_cases_json(json_path):
             }
             em_special_cases.append(special_case)
             
-            # 准备JSON数据（去除reader字段）
             json_row = row.to_dict()
             del json_row['reader']
             em_special_rows.append(json_row)
     
     print(f"EM == True && Acc == False: {len(em_special_cases)}")
     
-    # 保存EM特殊案例到JSONL文件
     output_jsonl_path = json_path.replace('.json', '_em_special_cases.jsonl')
     with open(output_jsonl_path, 'w', encoding='utf-8') as f:
         for case in em_special_cases:
             f.write(json.dumps(case, ensure_ascii=False) + '\n')
     
-    # 保存EM特殊案例到JSON文件
     if em_special_rows:
         output_json_path = json_path.replace('.json', '_em_special_cases.json')
         with open(output_json_path, 'w', encoding='utf-8') as f:
@@ -297,5 +276,3 @@ if __name__ == "__main__":
 
     em_score = calculate_em(args.result_file)
     print(f"EM: {em_score:.4f}")
-
-    # find_and_save_special_cases_json(args.result_file)
